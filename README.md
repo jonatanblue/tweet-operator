@@ -62,5 +62,5 @@ $ ${path_to_controller_tools}/controller-gen paths=github.com/jonatanblue/tweet-
 This will generate a yaml file in `manifests/`. Use it to register the CRD in the cluster:
 
 ```
-kubectl apply -f manifests/example.com_tweets.yaml
+kubectl create -f manifests/example.com_tweets.yaml
 ```

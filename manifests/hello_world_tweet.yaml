@@ -1,0 +1,6 @@
+apiVersion: example.com/v1
+kind: Tweet
+metadata:
+  name: hello-world
+spec:
+  text: "Hello, world!"
