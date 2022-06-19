@@ -16,13 +16,15 @@ export TWITTER_BEARER_TOKEN="redacted"
 
 ## Generate code
 
+This bit is for your reference, for when you write your own operator. I have tried to structure the commits to split up making the blueprint (the first three files in the `pgk/apis` folder) from the code generation.
+
 ### Set up your GOPATH
 
 I am using these folders:
 
 * GOPATH: `/Users/jonatan/go`
 * This project: `/Users/jonatan/go/src/github.com/jonatanblue/tweet-operator`
-* code-generator: `/Users/jonatan/go/src/k8s.io/code-generator`
+* code-generator: `/Users/jonatan/go/src/k8s.io/code-generator` (cloned from https://github.com/kubernetes/code-generator)
 
 ### Run code generator
 
