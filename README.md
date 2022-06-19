@@ -1,4 +1,10 @@
-# Setup
+# TweetOperator
+
+This repo is intended as an example project, showing how to write a custom Kubernetes controller, aka operator. I mainly want to show two things: writing a simple operator without all the bells and whistles is actually pretty straight-forward - as long as you get the code generation right - and that a Kubernetes controller can do pretty much anything: [manage DaemonSets](https://github.com/openkruise/kruise/blob/master/pkg/controller/daemonset/daemonset_controller.go), [order pizza](https://github.com/rudoi/cruster-api) and tweet.
+
+The TweetOperator posts a tweet for each Tweet custom resource created in the cluster, and posts back status information about the tweet: likes, retweets, etc.
+
+## Setup
 
 Add the following to `env.local`:
 
@@ -8,9 +14,9 @@ export TWITTER_API_SECRET="redacted"
 export TWITTER_BEARER_TOKEN="redacted"
 ```
 
-# Generate code
+## Generate code
 
-## Set up your GOPATH
+### Set up your GOPATH
 
 I am using these folders:
 
@@ -18,7 +24,7 @@ I am using these folders:
 * This project: `/Users/jonatan/go/src/github.com/jonatanblue/tweet-operator`
 * code-generator: `/Users/jonatan/go/src/k8s.io/code-generator`
 
-## Run code generator
+### Run code generator
 
 ```
 $ codegen_path=/Users/jonatan/go/src/k8s.io/code-generator
