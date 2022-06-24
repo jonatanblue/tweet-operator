@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tweet-operator
+  namespace: default
+  labels:
+    app: tweet-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tweet-operator
+  template:
+    metadata:
+      labels:
+        app: tweet-operator
+    spec:
+      serviceAccountName: tweet-operator-sa
+      containers:
+      - name: tweet-operator
+        image: docker.io/library/tweet-operator:v1
+        imagePullPolicy: IfNotPresent
+        # Get env vars from secret
+        env:
+        - name: CONSUMER_KEY
+          valueFrom:
+            secretKeyRef:
+              name: twitter-credentials
+              key: CONSUMER_KEY
+        - name: CONSUMER_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: twitter-credentials
+              key: CONSUMER_SECRET
+        - name: ACCESS_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: twitter-credentials
+              key: ACCESS_TOKEN
+        - name: ACCESS_TOKEN_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: twitter-credentials
+              key: ACCESS_TOKEN_SECRET
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: tweet-operator-sa
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: tweet-operator-sa-role
+  namespace: default
+rules:
+  - apiGroups: ["example.com"]
+    resources: ["tweets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tweet-operator-sa-role-binding
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: tweet-operator-sa-role
+subjects:
+  - kind: ServiceAccount
+    name: tweet-operator-sa
+    namespace: default
+---

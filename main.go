@@ -2,13 +2,11 @@ package main
 
 import (
 	"context"
-	"flag"
 	"log"
 	"os"
 	"path/filepath"
 
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -16,6 +14,8 @@ import (
 	"github.com/dghubble/oauth1"
 
 	tweetClient "github.com/jonatanblue/tweet-operator/pkg/client/clientset/versioned"
+
+	"k8s.io/client-go/rest"
 )
 
 type Credentials struct {
@@ -49,23 +49,43 @@ func mustLookupEnv(key string) string {
 	return value
 }
 
-func main() {
+func inClusterConfigAvailable() bool {
+	host, port := os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT")
+	return len(host) > 0 && len(port) > 0
+}
 
-	var kubeconfig *string
-
-	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+func getKubeConfig() (*rest.Config, error) {
+	var config *rest.Config
+	var err error
+	if inClusterConfigAvailable() {
+		config, err = rest.InClusterConfig()
 	} else {
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		if value, ok := os.LookupEnv("KUBECONFIG"); ok {
+			config, err = clientcmd.BuildConfigFromFlags("", value)
+		} else {
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return nil, err
+			}
+			config, err = clientcmd.BuildConfigFromFlags("", filepath.Join(homeDir, ".kube", "config"))
+			if err != nil {
+				return nil, err
+			}
+		}
 	}
-	flag.Parse()
-
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
 	if err != nil {
-		log.Printf("Building config from flags, %s", err.Error())
+		return nil, err
+	}
+	return config, nil
+}
+
+func main() {
+	kubeConfig, err := getKubeConfig()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	tweetClient := tweetClient.NewForConfigOrDie(config)
+	tweetClient := tweetClient.NewForConfigOrDie(kubeConfig)
 
 	tweet, err := tweetClient.ExampleV1().Tweets("default").Get(context.Background(), "hello-world", metav1.GetOptions{})
 	if err != nil {
@@ -79,11 +99,16 @@ func main() {
 		AccessTokenSecret: mustLookupEnv("ACCESS_TOKEN_SECRET"),
 	}
 
+	log.Print("main: getting Twitter client...")
 	twitterAPIClient, err := Twitter(creds)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	log.Print("creds are good - but not tweeting just yet")
+	os.Exit(0)
+
+	log.Print("main: tweeting...")
 	t, r, err := twitterAPIClient.Statuses.Update(tweet.Spec.Text, nil)
 	if err != nil {
 		log.Fatal(err)

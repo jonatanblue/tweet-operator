@@ -24,10 +24,38 @@ ACCESS_TOKEN_SECRET=<redacted>
 
 ## Development
 
+### Run locally
+
+Export environment variables
+
+```
+. env.local
+```
+
+Run the operator locally:
+
+```
+go run main.go
+```
+
+### Run in a cluster
+
+Build Dockerimage
+
+```
+docker build --tag tweet-operator:v1 .
+```
+
 Set up a KIND cluster for local testing.
 
 ```
 kind create cluster
+```
+
+Load image into kind cluster:
+
+```
+kind load docker-image tweet-operator:v1
 ```
 
 Create the Tweet custom resource:
@@ -42,10 +70,28 @@ Export environment variables
 . env.local
 ```
 
-Run the operator locally:
+Create secret object for the Twitter API credentials:
 
 ```
-go run main.go
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: twitter-credentials
+  namespace: default
+type: Opaque
+data:
+  CONSUMER_KEY: $(printf "$CONSUMER_KEY" | base64)
+  CONSUMER_SECRET: $(printf "$CONSUMER_SECRET" | base64)
+  ACCESS_TOKEN: $(printf "${ACCESS_TOKEN}" | base64)
+  ACCESS_TOKEN_SECRET: $(printf "$ACCESS_TOKEN_SECRET" | base64)
+EOF
+```
+
+Create operator Deployment:
+
+```
+kubectl apply -f manifests/operator.yaml
 ```
 
 ## Appendix 1: Code generation
