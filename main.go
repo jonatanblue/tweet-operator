@@ -2,29 +2,43 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 
-	twitter "github.com/g8rswimmer/go-twitter/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	client "github.com/jonatanblue/tweet-operator/pkg/client/clientset/versioned"
+	"github.com/dghubble/go-twitter/twitter"
+	"github.com/dghubble/oauth1"
+
+	tweetClient "github.com/jonatanblue/tweet-operator/pkg/client/clientset/versioned"
 )
 
-type authorize struct {
-	Token string
+type Credentials struct {
+	ConsumerKey       string
+	ConsumerSecret    string
+	AccessToken       string
+	AccessTokenSecret string
 }
 
-func (a authorize) Add(req *http.Request) {
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", a.Token))
+func Twitter(creds *Credentials) (*twitter.Client, error) {
+	config := oauth1.NewConfig(creds.ConsumerKey, creds.ConsumerSecret)
+	token := oauth1.NewToken(creds.AccessToken, creds.AccessTokenSecret)
+	httpClient := config.Client(oauth1.NoContext, token)
+	client := twitter.NewClient(httpClient)
+	verifyParams := &twitter.AccountVerifyParams{
+		SkipStatus:   twitter.Bool(true),
+		IncludeEmail: twitter.Bool(false),
+	}
+	_, _, err := client.Accounts.VerifyCredentials(verifyParams)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
 }
 
 func mustLookupEnv(key string) string {
@@ -35,9 +49,6 @@ func mustLookupEnv(key string) string {
 	return value
 }
 
-/**
-	In order to run, the user will need to provide the bearer token and the list of ids.
-**/
 func main() {
 
 	var kubeconfig *string
@@ -54,36 +65,30 @@ func main() {
 		log.Printf("Building config from flags, %s", err.Error())
 	}
 
-	client := client.NewForConfigOrDie(config)
+	tweetClient := tweetClient.NewForConfigOrDie(config)
 
-	log.Printf("Client: %v", client)
-
-	token := mustLookupEnv("TWITTER_BEARER_TOKEN")
-	ids := flag.String("ids", "", "twitter ids")
-	flag.Parse()
-
-	client := &twitter.Client{
-		Authorizer: authorize{
-			Token: token,
-		},
-		Client: http.DefaultClient,
-		Host:   "https://api.twitter.com",
-	}
-	opts := twitter.TweetLookupOpts{
-		Expansions:  []twitter.Expansion{twitter.ExpansionEntitiesMentionsUserName, twitter.ExpansionAuthorID},
-		TweetFields: []twitter.TweetField{twitter.TweetFieldCreatedAt, twitter.TweetFieldConversationID, twitter.TweetFieldAttachments},
-	}
-
-	fmt.Println("Callout to tweet lookup callout")
-
-	tweetDictionary, err := client.TweetLookup(context.Background(), strings.Split(*ids, ","), opts)
+	tweet, err := tweetClient.ExampleV1().Tweets("default").Get(context.Background(), "hello-world", metav1.GetOptions{})
 	if err != nil {
-		log.Panicf("tweet lookup error: %v", err)
+		log.Fatal(err)
 	}
 
-	enc, err := json.MarshalIndent(tweetDictionary, "", "    ")
-	if err != nil {
-		log.Panic(err)
+	creds := &Credentials{
+		ConsumerKey:       mustLookupEnv("CONSUMER_KEY"),
+		ConsumerSecret:    mustLookupEnv("CONSUMER_SECRET"),
+		AccessToken:       mustLookupEnv("ACCESS_TOKEN"),
+		AccessTokenSecret: mustLookupEnv("ACCESS_TOKEN_SECRET"),
 	}
-	fmt.Println(string(enc))
+
+	twitterAPIClient, err := Twitter(creds)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	t, r, err := twitterAPIClient.Statuses.Update(tweet.Spec.Text, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("tweet: %+v\n", t)
+	log.Printf("response: %+v\n", r)
+
 }

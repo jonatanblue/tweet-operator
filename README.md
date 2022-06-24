@@ -6,23 +6,51 @@ The TweetOperator posts a tweet for each Tweet custom resource created in the cl
 
 ## Setup
 
-Add the following to `env.local`:
+Go to https://developer.twitter.com, set up a developer account and fill out the form to apply for **Elevated access**.
+
+Access needed for the app:
+* `tweet.read`
+* `tweet.write`
+* `users.read`
+
+Add the credentials to `env.local`:
 
 ```
-export TWITTER_API_KEY="redacted"
-export TWITTER_API_SECRET="redacted"
-export TWITTER_BEARER_TOKEN="redacted"
+CONSUMER_KEY=<redacted>
+CONSUMER_SECRET=<redacted>
+ACCESS_TOKEN=<redacted>
+ACCESS_TOKEN_SECRET=<redacted>
 ```
 
-## Run
+## Development
+
+Set up a KIND cluster for local testing.
 
 ```
-#TODO
+kind create cluster
+```
+
+Create the Tweet custom resource:
+
+```
+kubectl create -f manifests/hello_world_tweet.yaml
+```
+
+Export environment variables
+
+```
+. env.local
+```
+
+Run the operator locally:
+
+```
+go run main.go
 ```
 
 ## Appendix 1: Code generation
 
-This bit is for your reference, for when you write your own operator. I have tried to structure the commits to split up making the blueprint (the first three files in the `pgk/apis` folder) from the code generation.
+This bit is for your reference, for when you write your own operator. I have structured the commits to split up making the blueprint (the first three files in the `pgk/apis` folder) from the code generation.
 
 ### Set up your GOPATH
 
