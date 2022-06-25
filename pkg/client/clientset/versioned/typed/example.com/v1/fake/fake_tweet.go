@@ -117,7 +117,7 @@ func (c *FakeTweets) UpdateStatus(ctx context.Context, tweet *examplecomv1.Tweet
 // Delete takes name of the tweet and deletes it. Returns an error if one occurs.
 func (c *FakeTweets) Delete(ctx context.Context, name string, opts v1.DeleteOptions) error {
 	_, err := c.Fake.
-		Invokes(testing.NewDeleteAction(tweetsResource, c.ns, name), &examplecomv1.Tweet{})
+		Invokes(testing.NewDeleteActionWithOptions(tweetsResource, c.ns, name, opts), &examplecomv1.Tweet{})
 
 	return err
 }
