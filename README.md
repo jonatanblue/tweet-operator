@@ -16,6 +16,7 @@ Access needed for the app:
 Add the credentials to `env.local`:
 
 ```
+TWITTER_USERNAME=<some username>
 CONSUMER_KEY=<redacted>
 CONSUMER_SECRET=<redacted>
 ACCESS_TOKEN=<redacted>
