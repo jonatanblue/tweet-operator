@@ -19,8 +19,10 @@ type TweetSpec struct {
 }
 
 type TweetStatus struct {
+	ID       int64 `json:"id,omitempty"`
 	Likes    int64 `json:"likes,omitempty"`
 	Retweets int64 `json:"retweets,omitempty"`
+	Replies  int64 `json:"replies,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
