@@ -11,7 +11,7 @@ import (
 
 type tweetClient interface {
 	Create(ctx context.Context, tweet *v1.Tweet, opts metav1.CreateOptions) (*v1.Tweet, error)
-	UpdateStatus(ctx context.Context, tweet *v1.Tweet, opts metav1.UpdateOptions) (*v1.Tweet, error)
+	Update(ctx context.Context, tweet *v1.Tweet, opts metav1.UpdateOptions) (*v1.Tweet, error)
 	Get(ctx context.Context, name string, opts metav1.GetOptions) (*v1.Tweet, error)
 	List(ctx context.Context, opts metav1.ListOptions) (*v1.TweetList, error)
 }
@@ -43,20 +43,22 @@ func (c *K8sClient) GetTweet(name string) (*tweettypes.Tweet, error) {
 		},
 	}, nil
 }
+
 func (c *K8sClient) UpdateStatus(name string, tweet *tweettypes.Tweet) error {
-	_, err := c.tweetClient.UpdateStatus(
+	t, err := c.tweetClient.Get(context.TODO(), name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	new := t.DeepCopy()
+	new.Status = v1.TweetStatus{
+		ID:       tweet.Status.ID,
+		Likes:    tweet.Status.Likes,
+		Retweets: tweet.Status.Retweets,
+		Replies:  tweet.Status.Replies,
+	}
+	_, err = c.tweetClient.Update(
 		context.TODO(),
-		&v1.Tweet{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: name,
-			},
-			Status: v1.TweetStatus{
-				ID:       tweet.Status.ID,
-				Likes:    tweet.Status.Likes,
-				Retweets: tweet.Status.Retweets,
-				Replies:  tweet.Status.Replies,
-			},
-		},
+		new,
 		metav1.UpdateOptions{},
 	)
 	return err

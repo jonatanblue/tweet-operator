@@ -136,7 +136,7 @@ func Test_UpdateStatus(t *testing.T) {
 			if err != nil {
 				assert.EqualError(t, err, test.err.Error())
 			}
-			test.client.tweetClient.(*tweetClientMock).AssertNumberOfCalls(t, "UpdateStatus", test.calls)
+			test.client.tweetClient.(*tweetClientMock).AssertNumberOfCalls(t, "Update", test.calls)
 		})
 	}
 }
@@ -166,7 +166,7 @@ func (mock *tweetClientMock) Create(ctx context.Context, tweet *v1.Tweet, opts m
 	return res.(*v1.Tweet), args.Error(1)
 }
 
-func (mock *tweetClientMock) UpdateStatus(ctx context.Context, tweet *v1.Tweet, opts metav1.UpdateOptions) (*v1.Tweet, error) {
+func (mock *tweetClientMock) Update(ctx context.Context, tweet *v1.Tweet, opts metav1.UpdateOptions) (*v1.Tweet, error) {
 	args := mock.Called(tweet, opts)
 	res := args.Get(0)
 	if res == nil {
