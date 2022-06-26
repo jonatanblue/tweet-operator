@@ -124,14 +124,14 @@ First clone the repo for controller-tools and build the binary:
 
 ```
 git clone git@github.com:kubernetes-sigs/controller-tools.git
-cd controller-tools
+cd controller-tools/cmd/controller-gen
 go build
 ```
 
 Then, from the root of your project, run the binary:
 
 ```
-$ ${path_to_controller_tools}/controller-gen paths=github.com/jonatanblue/tweet-operator/pkg/apis/example.com/v1 crd:crdVersions=v1 output:crd:artifacts:config=manifests
+$ ${path_to_controller_gen}/controller-gen paths=github.com/jonatanblue/tweet-operator/pkg/apis/example.com/v1 crd:crdVersions=v1 output:crd:artifacts:config=manifests
 ```
 
 This will generate a yaml file in `manifests/`. Use it to register the CRD in the cluster:
