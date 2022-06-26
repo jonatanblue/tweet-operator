@@ -22,6 +22,11 @@ spec:
         imagePullPolicy: IfNotPresent
         # Get env vars from secret
         env:
+        - name: TWITTER_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: twitter-credentials
+              key: TWITTER_USERNAME
         - name: CONSUMER_KEY
           valueFrom:
             secretKeyRef:

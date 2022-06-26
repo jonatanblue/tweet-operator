@@ -82,6 +82,7 @@ metadata:
   namespace: default
 type: Opaque
 data:
+  TWITTER_USERNAME: $(printf "$TWITTER_USERNAME" | base64)
   CONSUMER_KEY: $(printf "$CONSUMER_KEY" | base64)
   CONSUMER_SECRET: $(printf "$CONSUMER_SECRET" | base64)
   ACCESS_TOKEN: $(printf "${ACCESS_TOKEN}" | base64)
