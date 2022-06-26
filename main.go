@@ -1,45 +1,22 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"k8s.io/client-go/tools/clientcmd"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/jonatanblue/tweet-operator/pkg/libs/k8sclient"
+	"github.com/jonatanblue/tweet-operator/pkg/libs/twitterclient"
 
-	"github.com/dghubble/go-twitter/twitter"
-	"github.com/dghubble/oauth1"
-
-	tweetClient "github.com/jonatanblue/tweet-operator/pkg/client/clientset/versioned"
+	"github.com/jonatanblue/tweet-operator/pkg/reconciler"
 
 	"k8s.io/client-go/rest"
+
+	tweetclient "github.com/jonatanblue/tweet-operator/pkg/client/clientset/versioned"
 )
-
-type Credentials struct {
-	ConsumerKey       string
-	ConsumerSecret    string
-	AccessToken       string
-	AccessTokenSecret string
-}
-
-func Twitter(creds *Credentials) (*twitter.Client, error) {
-	config := oauth1.NewConfig(creds.ConsumerKey, creds.ConsumerSecret)
-	token := oauth1.NewToken(creds.AccessToken, creds.AccessTokenSecret)
-	httpClient := config.Client(oauth1.NoContext, token)
-	client := twitter.NewClient(httpClient)
-	verifyParams := &twitter.AccountVerifyParams{
-		SkipStatus:   twitter.Bool(true),
-		IncludeEmail: twitter.Bool(false),
-	}
-	_, _, err := client.Accounts.VerifyCredentials(verifyParams)
-	if err != nil {
-		return nil, err
-	}
-	return client, nil
-}
 
 func mustLookupEnv(key string) string {
 	value := os.Getenv(key)
@@ -80,40 +57,46 @@ func getKubeConfig() (*rest.Config, error) {
 }
 
 func main() {
+	// Kubernetes client
 	kubeConfig, err := getKubeConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
+	tweetClientSet := tweetclient.NewForConfigOrDie(kubeConfig)
+	tweetClient := tweetClientSet.ExampleV1().Tweets("default")
+	k8sClient := k8sclient.NewK8sClient(tweetClient)
 
-	tweetClient := tweetClient.NewForConfigOrDie(kubeConfig)
-
-	tweet, err := tweetClient.ExampleV1().Tweets("default").Get(context.Background(), "hello-world", metav1.GetOptions{})
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	creds := &Credentials{
+	// Twitter client
+	creds := twitterclient.Credentials{
 		ConsumerKey:       mustLookupEnv("CONSUMER_KEY"),
 		ConsumerSecret:    mustLookupEnv("CONSUMER_SECRET"),
 		AccessToken:       mustLookupEnv("ACCESS_TOKEN"),
 		AccessTokenSecret: mustLookupEnv("ACCESS_TOKEN_SECRET"),
 	}
-
-	log.Print("main: getting Twitter client...")
-	twitterAPIClient, err := Twitter(creds)
+	apiClient, err := twitterclient.NewTwitterAPIClient(&creds)
 	if err != nil {
 		log.Fatal(err)
 	}
+	twitterClient := twitterclient.NewTwitterClient(
+		apiClient.Statuses,
+		apiClient.Timelines,
+	)
 
-	log.Print("creds are good - but not tweeting just yet")
-	os.Exit(0)
+	// Reconciler
+	reconciler := reconciler.NewTweetReconciler(
+		k8sClient,
+		twitterClient,
+		mustLookupEnv("TWITTER_USERNAME"),
+	)
 
-	log.Print("main: tweeting...")
-	t, r, err := twitterAPIClient.Statuses.Update(tweet.Spec.Text, nil)
-	if err != nil {
-		log.Fatal(err)
+	log.Print("Starting reconciliation loop...")
+	for true {
+		reconciled, err := reconciler.Reconcile()
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("main: reconciled=%v", reconciled)
+
+		<-time.After(10 * time.Second)
 	}
-	log.Printf("tweet: %+v\n", t)
-	log.Printf("response: %+v\n", r)
-
 }
