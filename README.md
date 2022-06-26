@@ -1,6 +1,6 @@
 # TweetOperator
 
-This repo is intended as an example project, showing how to write a custom Kubernetes controller, aka operator. I mainly want to show two things: writing a simple operator without all the bells and whistles is actually pretty straight-forward - as long as you get the code generation right - and that a Kubernetes controller can do pretty much anything: [manage DaemonSets](https://github.com/kubernetes/kubernetes/blob/master/pkg/controller/daemon/daemon_controller.go), [order pizza](https://github.com/rudoi/cruster-api) and tweet.
+This repo is intended as an example project, showing how to write a custom Kubernetes controller, aka operator. I mainly want to show two things: writing a simple operator without all the bells and whistles is actually pretty straight-forward - as long as you get the code generation right - and that a Kubernetes controller can do pretty much anything: [manage DaemonSets](https://github.com/kubernetes/kubernetes/blob/master/pkg/controller/daemon/daemon_controller.go), [order pizza](https://github.com/rudoi/cruster-api) and [tweet](https://twitter.com/TweetOperator).
 
 The TweetOperator posts a tweet for each Tweet custom resource created in the cluster, and posts back status information about the tweet: likes, retweets, etc.
 
