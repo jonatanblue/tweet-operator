@@ -54,3 +54,20 @@ spec:
         type: object
     served: true
     storage: true
+    additionalPrinterColumns:
+    - name: Text
+      type: string
+      description: The Tweet text
+      jsonPath: .spec.text
+    - name: Likes
+      type: integer
+      description: The number of likes received
+      jsonPath: .status.likes
+    - name: Replies
+      type: integer
+      description: The number of replies to the tweet
+      jsonPath: .status.replies
+    - name: Retweets
+      type: integer
+      description: The number of retweets of the tweet
+      jsonPath: .status.retweets
