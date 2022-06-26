@@ -46,6 +46,7 @@ func Test_GetTweet(t *testing.T) {
 			name: "hello-world",
 			want: &tweettypes.Tweet{
 				Spec: tweettypes.TweetSpec{
+					Name: "hello-world",
 					Text: "Hello World",
 				},
 				Status: tweettypes.TweetStatus{

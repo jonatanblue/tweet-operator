@@ -33,6 +33,7 @@ func (c *K8sClient) GetTweet(name string) (*tweettypes.Tweet, error) {
 	}
 	return &tweettypes.Tweet{
 		Spec: tweettypes.TweetSpec{
+			Name: tweet.Name,
 			Text: tweet.Spec.Text,
 		},
 		Status: tweettypes.TweetStatus{

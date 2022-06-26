@@ -14,7 +14,7 @@ func Test_GetTweetsForUser(t *testing.T) {
 	tests := map[string]struct {
 		client *TwitterClient
 		name   string
-		want   *tweettypes.Tweets
+		want   tweettypes.Tweets
 		calls  int
 		err    error
 	}{
@@ -49,7 +49,7 @@ func Test_GetTweetsForUser(t *testing.T) {
 				),
 			),
 			name: "bob",
-			want: &tweettypes.Tweets{
+			want: tweettypes.Tweets{
 				{
 					Spec: tweettypes.TweetSpec{
 						Text: "Hello World",
@@ -123,6 +123,51 @@ func Test_PostTweet(t *testing.T) {
 	}
 }
 
+func Test_DeleteTweet(t *testing.T) {
+	tests := map[string]struct {
+		client *TwitterClient
+		in     *tweettypes.Tweet
+		method string
+		calls  int
+		err    error
+	}{
+		"delete tweet success": {
+			client: NewTwitterClient(
+				newStatusClientMock(
+					"Destroy",
+					[]interface{}{
+						int64(12345),
+						&twitter.StatusDestroyParams{
+							ID: 12345,
+						},
+					},
+					nil,
+					nil,
+				),
+				nil,
+			),
+			in: &tweettypes.Tweet{
+				Status: tweettypes.TweetStatus{
+					ID: 12345,
+				},
+			},
+			method: "Destroy",
+			calls:  1,
+			err:    nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := test.client.DeleteTweet(test.in)
+			if err != nil {
+				assert.EqualError(t, test.err, err.Error())
+			}
+			test.client.statusClient.(*statusClientMock).AssertNumberOfCalls(t, "Destroy", test.calls)
+		})
+	}
+}
+
 func newStatusClientMock(method string, args []interface{}, ret interface{}, err error) *statusClientMock {
 	client := new(statusClientMock)
 	client.On(method, args...).Return(ret, err)
@@ -135,6 +180,14 @@ type statusClientMock struct {
 
 func (mock *statusClientMock) Update(status string, params *twitter.StatusUpdateParams) (*twitter.Tweet, *http.Response, error) {
 	args := mock.Called(status, params)
+	if args.Get(0) == nil {
+		return nil, nil, args.Error(1)
+	}
+	return args.Get(0).(*twitter.Tweet), nil, args.Error(1)
+}
+
+func (mock *statusClientMock) Destroy(id int64, params *twitter.StatusDestroyParams) (*twitter.Tweet, *http.Response, error) {
+	args := mock.Called(id, params)
 	if args.Get(0) == nil {
 		return nil, nil, args.Error(1)
 	}

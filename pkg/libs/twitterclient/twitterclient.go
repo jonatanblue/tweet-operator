@@ -1,7 +1,6 @@
 package twitterclient
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/dghubble/go-twitter/twitter"
@@ -11,6 +10,7 @@ import (
 
 type StatusClient interface {
 	Update(status string, params *twitter.StatusUpdateParams) (*twitter.Tweet, *http.Response, error)
+	Destroy(id int64, params *twitter.StatusDestroyParams) (*twitter.Tweet, *http.Response, error)
 }
 
 type TimelineClient interface {
@@ -32,7 +32,7 @@ func NewTwitterClient(
 	}
 }
 
-func (c *TwitterClient) GetTweetsForUser(userName string) (*tweettypes.Tweets, error) {
+func (c *TwitterClient) GetTweetsForUser(userName string) (tweettypes.Tweets, error) {
 	params := &twitter.UserTimelineParams{
 		ScreenName: userName,
 		Count:      200,
@@ -61,7 +61,7 @@ func (c *TwitterClient) GetTweetsForUser(userName string) (*tweettypes.Tweets, e
 			},
 		)
 	}
-	return &result, nil
+	return result, nil
 }
 
 func (c *TwitterClient) PostTweet(tweet *tweettypes.Tweet) error {
@@ -76,8 +76,18 @@ func (c *TwitterClient) PostTweet(tweet *tweettypes.Tweet) error {
 	}
 	return nil
 }
+
 func (c *TwitterClient) DeleteTweet(tweet *tweettypes.Tweet) error {
-	return errors.New("todo")
+	_, _, err := c.statusClient.Destroy(
+		tweet.Status.ID,
+		&twitter.StatusDestroyParams{
+			ID: tweet.Status.ID,
+		},
+	)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func NewTwitterAPIClient(creds *Credentials) (*twitter.Client, error) {

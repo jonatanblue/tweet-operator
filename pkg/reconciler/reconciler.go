@@ -14,7 +14,7 @@ type K8sClient interface {
 }
 
 type TwitterClient interface {
-	GetTweetsForUser(userName string) (result *tweettypes.Tweets, err error)
+	GetTweetsForUser(userName string) (result tweettypes.Tweets, err error)
 	PostTweet(tweet *tweettypes.Tweet) error
 	DeleteTweet(tweet *tweettypes.Tweet) error
 }
@@ -38,22 +38,30 @@ func NewTweetReconciler(
 }
 
 func (reconciler *TweetReconciler) Reconcile() (bool, error) {
-	desiredTweets, err := reconciler.k8sClient.ListTweets()
+	desiredTweetList, err := reconciler.k8sClient.ListTweets()
 	if err != nil {
 		return false, errors.Wrapf(err, "failed to get tweet list from k8s")
 	}
-	log.Printf("Got tweets from k8s, %+v", desiredTweets)
+	log.Printf("Got tweets from k8s, %+v", desiredTweetList)
 
-	for _, t := range *desiredTweets {
+	for _, t := range *desiredTweetList {
 		log.Printf("Reconciling tweet, %+v", t)
 		desired, err := reconciler.getDesiredState(t.Spec.Name)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to get desired state for %s", t.Spec.Name)
 		}
+		log.Printf("Got desired state, %+v", desired)
+
 		actual, err := reconciler.getActualState(desired.Spec.Text)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to get actual state for %s", t.Spec.Name)
 		}
+
+		// Name only exists in Kubernetes so patching this on here
+		actual.Spec.Name = desired.Spec.Name
+
+		log.Printf("Got actual state, %+v", actual)
+
 		reconciled, err := reconciler.ReconcileOne(desired, actual)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to reconcile %s", t.Spec.Name)
@@ -69,6 +77,39 @@ func (reconciler *TweetReconciler) Reconcile() (bool, error) {
 			return false, nil
 		}
 	}
+
+	// Clean up deleted tweets
+	desiredTweetList, err = reconciler.k8sClient.ListTweets()
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get tweet list from k8s")
+	}
+	log.Printf("Got refreshed list of tweets from k8s, %+v", desiredTweetList)
+
+	actualTweetList, err := reconciler.twitterClient.GetTweetsForUser(reconciler.twitterUserName)
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get tweets for user %s", reconciler.twitterUserName)
+	}
+	log.Printf("Got tweets from twitter, %+v", actualTweetList)
+
+	for _, t := range actualTweetList {
+		found := false
+		for _, d := range *desiredTweetList {
+			// Compare the Text instead of the Name, because the Name is only in Kubernetes
+			if d.Spec.Text == t.Spec.Text {
+				found = true
+				break
+			}
+		}
+		if !found {
+			log.Printf("Deleting tweet, %+v", t)
+			err = reconciler.twitterClient.DeleteTweet(&t)
+			if err != nil {
+				return false, errors.Wrapf(err, "failed to delete tweet %s", t.Spec.Name)
+			}
+			return false, nil
+		}
+	}
+
 	return true, nil
 }
 
@@ -109,7 +150,7 @@ func (reconciler *TweetReconciler) getActualState(text string) (*tweettypes.Twee
 		return nil, errors.Wrap(err, "failed to get tweets")
 	}
 
-	for _, tweet := range *tweets {
+	for _, tweet := range tweets {
 		if tweet.Spec.Text == text {
 			return &tweet, nil
 		}

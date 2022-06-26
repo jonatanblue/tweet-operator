@@ -11,6 +11,94 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+type methodCall struct {
+	name  string
+	count int
+}
+
+func Test_ReconcileDeleteTweet(t *testing.T) {
+	tests := map[string]struct {
+		k8sMock     *k8sClientMock
+		twitterMock *twitterClientMock
+		username    string
+		reconciled  bool
+		err         error
+	}{
+		"one tweet should be untouched": {
+			k8sMock: newK8sClientMock(
+				"ListTweets",
+				[]interface{}{},
+				&tweettypes.Tweets{*newTweet("hello-world", "Hello World", 1)},
+				nil,
+			).addMethod(
+				"GetTweet",
+				[]interface{}{"hello-world"},
+				newTweet("hello-world", "Hello World", 1),
+				nil,
+			).addMethod(
+				"UpdateStatus",
+				[]interface{}{newTweet("hello-world", "Hello World", 1)},
+				nil,
+				nil,
+			).addMethod(
+				"ListTweets",
+				[]interface{}{},
+				&tweettypes.Tweets{*newTweet("hello-world", "Hello World", 1)},
+				nil,
+			),
+			twitterMock: newTwitterClientMock(
+				"GetTweetsForUser",
+				"bob",
+				tweettypes.Tweets{*newTweet("", "Hello World", 1)},
+				nil,
+			),
+			username:   "bob",
+			reconciled: true,
+			err:        nil,
+		},
+		"one tweet should be deleted": {
+			k8sMock: newK8sClientMock(
+				"ListTweets",
+				[]interface{}{},
+				&tweettypes.Tweets{},
+				nil,
+			).addMethod(
+				"ListTweets",
+				[]interface{}{},
+				&tweettypes.Tweets{},
+				nil,
+			),
+			twitterMock: newTwitterClientMock(
+				"GetTweetsForUser",
+				"bob",
+				tweettypes.Tweets{*newTweet("", "Hello World", 1)},
+				nil,
+			).addMethod(
+				"DeleteTweet",
+				[]interface{}{newTweet("", "Hello World", 1)},
+				nil,
+				nil,
+			),
+			username:   "bob",
+			reconciled: false,
+			err:        nil,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			reconciler := NewTweetReconciler(test.k8sMock, test.twitterMock, test.username)
+			reconciled, err := reconciler.Reconcile()
+			if err != nil {
+				assert.EqualError(t, test.err, err.Error())
+			}
+			assert.Equal(t, test.reconciled, reconciled)
+			test.k8sMock.AssertExpectations(t)
+			test.twitterMock.AssertExpectations(t)
+		})
+	}
+}
+
 func Test_ReconcileOne(t *testing.T) {
 	tests := map[string]struct {
 		reconciler TweetReconciler
@@ -155,6 +243,7 @@ func Test_getDesiredState(t *testing.T) {
 					"hello-world",
 					&tweettypes.Tweet{
 						Spec: tweettypes.TweetSpec{
+							Name: "hello-world",
 							Text: "Hello World",
 						},
 					}),
@@ -162,6 +251,7 @@ func Test_getDesiredState(t *testing.T) {
 			tweetName: "hello-world",
 			desired: &tweettypes.Tweet{
 				Spec: tweettypes.TweetSpec{
+					Name: "hello-world",
 					Text: "Hello World",
 				},
 			},
@@ -191,7 +281,7 @@ func Test_getActualState(t *testing.T) {
 				twitterClient: newTwitterClientMock(
 					"GetTweetsForUser",
 					"bob",
-					&tweettypes.Tweets{},
+					tweettypes.Tweets{},
 					nil,
 				),
 				twitterUserName: "bob",
@@ -206,7 +296,7 @@ func Test_getActualState(t *testing.T) {
 				twitterClient: newTwitterClientMock(
 					"GetTweetsForUser",
 					"bob",
-					&tweettypes.Tweets{
+					tweettypes.Tweets{
 						{
 							Spec: tweettypes.TweetSpec{
 								Text: "Hello World",
@@ -286,12 +376,22 @@ type twitterClientMock struct {
 	mock.Mock
 }
 
-func (mock *twitterClientMock) GetTweetsForUser(userName string) (*tweettypes.Tweets, error) {
+func (mock *twitterClientMock) addMethod(
+	methodName string,
+	args []interface{},
+	ret interface{},
+	err error,
+) *twitterClientMock {
+	mock.On(methodName, args...).Return(ret, err)
+	return mock
+}
+
+func (mock *twitterClientMock) GetTweetsForUser(userName string) (tweettypes.Tweets, error) {
 	args := mock.Called(userName)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*tweettypes.Tweets), args.Error(1)
+	return args.Get(0).(tweettypes.Tweets), args.Error(1)
 }
 
 func (mock *twitterClientMock) PostTweet(tweet *tweettypes.Tweet) error {
@@ -304,8 +404,24 @@ func (mock *twitterClientMock) DeleteTweet(tweet *tweettypes.Tweet) error {
 	return args.Error(0)
 }
 
+func newK8sClientMock(methodName string, args []interface{}, ret interface{}, err error) *k8sClientMock {
+	client := new(k8sClientMock)
+	client.On(methodName, args...).Return(ret, err)
+	return client
+}
+
 type k8sClientMock struct {
 	mock.Mock
+}
+
+func (mock *k8sClientMock) addMethod(
+	methodName string,
+	args []interface{},
+	ret interface{},
+	err error,
+) *k8sClientMock {
+	mock.On(methodName, args...).Return(ret, err)
+	return mock
 }
 
 func (mock *k8sClientMock) GetTweet(name string) (*tweettypes.Tweet, error) {
@@ -327,4 +443,16 @@ func NewK8sClientMockGetTweetNoError(tweetName string, tweet *tweettypes.Tweet) 
 	client := new(k8sClientMock)
 	client.On("GetTweet", tweetName).Return(tweet, nil)
 	return client
+}
+
+func newTweet(name, text string, id int64) *tweettypes.Tweet {
+	return &tweettypes.Tweet{
+		Spec: tweettypes.TweetSpec{
+			Name: name,
+			Text: text,
+		},
+		Status: tweettypes.TweetStatus{
+			ID: id,
+		},
+	}
 }
