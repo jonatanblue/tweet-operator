@@ -318,6 +318,11 @@ func (mock *k8sClientMock) UpdateStatus(name string, tweet *tweettypes.Tweet) er
 	return args.Error(0)
 }
 
+func (mock *k8sClientMock) ListTweets() (*tweettypes.Tweets, error) {
+	args := mock.Called()
+	return args.Get(0).(*tweettypes.Tweets), args.Error(1)
+}
+
 func NewK8sClientMockGetTweetNoError(tweetName string, tweet *tweettypes.Tweet) *k8sClientMock {
 	client := new(k8sClientMock)
 	client.On("GetTweet", tweetName).Return(tweet, nil)

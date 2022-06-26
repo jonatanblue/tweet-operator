@@ -10,6 +10,7 @@ import (
 type K8sClient interface {
 	GetTweet(name string) (*tweettypes.Tweet, error)
 	UpdateStatus(name string, tweet *tweettypes.Tweet) error
+	ListTweets() (*tweettypes.Tweets, error)
 }
 
 type TwitterClient interface {
@@ -37,25 +38,31 @@ func NewTweetReconciler(
 }
 
 func (reconciler *TweetReconciler) Reconcile() (bool, error) {
-	crNames := []string{"hello-world"}
-	for _, name := range crNames {
-		desired, err := reconciler.getDesiredState(name)
+	desiredTweets, err := reconciler.k8sClient.ListTweets()
+	if err != nil {
+		return false, errors.Wrapf(err, "failed to get tweet list from k8s")
+	}
+	log.Printf("Got tweets from k8s, %+v", desiredTweets)
+
+	for _, t := range *desiredTweets {
+		log.Printf("Reconciling tweet, %+v", t)
+		desired, err := reconciler.getDesiredState(t.Spec.Name)
 		if err != nil {
-			return false, err
+			return false, errors.Wrapf(err, "failed to get desired state for %s", t.Spec.Name)
 		}
 		actual, err := reconciler.getActualState(desired.Spec.Text)
 		if err != nil {
-			return false, err
+			return false, errors.Wrapf(err, "failed to get actual state for %s", t.Spec.Name)
 		}
 		reconciled, err := reconciler.ReconcileOne(desired, actual)
 		if err != nil {
-			return false, err
+			return false, errors.Wrapf(err, "failed to reconcile %s", t.Spec.Name)
 		}
 
 		// Update custom resource with latest status
-		err = reconciler.k8sClient.UpdateStatus(name, actual)
+		err = reconciler.k8sClient.UpdateStatus(t.Spec.Name, actual)
 		if err != nil {
-			return false, errors.Wrapf(err, "failed to update status for %s", name)
+			return false, errors.Wrapf(err, "failed to update status for %s", t.Spec.Name)
 		}
 
 		if !reconciled {
