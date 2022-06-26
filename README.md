@@ -4,6 +4,12 @@ This repo is intended as an example project, showing how to write a custom Kuber
 
 The TweetOperator posts a tweet for each Tweet custom resource created in the cluster, and posts back status information about the tweet: likes, retweets, etc.
 
+```
+$ kubectl get tweet
+NAME           TEXT              LIKES   REPLIES   RETWEETS
+hello-world    Hello, world!     15      2         5
+```
+
 ## Setup
 
 Go to https://developer.twitter.com, set up a developer account and fill out the form to apply for **Elevated access**.
