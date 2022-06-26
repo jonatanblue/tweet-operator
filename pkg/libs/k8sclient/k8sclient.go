@@ -2,6 +2,7 @@ package k8sclient
 
 import (
 	"context"
+	"reflect"
 
 	v1 "github.com/jonatanblue/tweet-operator/pkg/apis/example.com/v1"
 
@@ -45,10 +46,10 @@ func (c *K8sClient) GetTweet(name string) (*tweettypes.Tweet, error) {
 	}, nil
 }
 
-func (c *K8sClient) UpdateStatus(name string, tweet *tweettypes.Tweet) error {
+func (c *K8sClient) UpdateStatus(name string, tweet *tweettypes.Tweet) (updated bool, err error) {
 	t, err := c.tweetClient.Get(context.TODO(), name, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return false, err
 	}
 	new := t.DeepCopy()
 	new.Status = v1.TweetStatus{
@@ -57,12 +58,18 @@ func (c *K8sClient) UpdateStatus(name string, tweet *tweettypes.Tweet) error {
 		Retweets: tweet.Status.Retweets,
 		Replies:  tweet.Status.Replies,
 	}
+	if reflect.DeepEqual(t, new) {
+		return false, nil
+	}
 	_, err = c.tweetClient.Update(
 		context.TODO(),
 		new,
 		metav1.UpdateOptions{},
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (c *K8sClient) ListTweets() (*tweettypes.Tweets, error) {

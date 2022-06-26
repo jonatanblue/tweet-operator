@@ -25,7 +25,7 @@ func Test_GetTweet(t *testing.T) {
 			client: NewK8sClient(
 				newTweetClientMock(
 					"Get",
-					"hello-world",
+					[]interface{}{"hello-world"},
 					&v1.Tweet{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "hello-world",
@@ -62,7 +62,7 @@ func Test_GetTweet(t *testing.T) {
 			client: NewK8sClient(
 				newTweetClientMock(
 					"Get",
-					"hello-world",
+					[]interface{}{"hello-world"},
 					nil,
 					errors.New("not found"),
 				),
@@ -86,41 +86,106 @@ func Test_GetTweet(t *testing.T) {
 
 func Test_UpdateStatus(t *testing.T) {
 	tests := map[string]struct {
-		client *K8sClient
-		name   string
-		in     *tweettypes.Tweet
-		calls  int
-		err    error
+		tweetClient *tweetClientMock
+		name        string
+		in          *tweettypes.Tweet
+		updated     bool
+		err         error
 	}{
 		"tweet status updated no error": {
-			client: NewK8sClient(
-				newTweetClientMockUpdateStatus(),
+			tweetClient: newTweetClientMock(
+				"Get",
+				[]interface{}{"hello-world"},
+				&v1.Tweet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hello-world",
+					},
+					Spec: v1.TweetSpec{
+						Text: "Hello World",
+					},
+					Status: v1.TweetStatus{
+						ID:    12345,
+						Likes: 0,
+					},
+				},
+				nil,
+			).addMethod(
+				"Update",
+				[]interface{}{
+					&v1.Tweet{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "hello-world",
+						},
+						Spec: v1.TweetSpec{
+							Text: "Hello World",
+						},
+						Status: v1.TweetStatus{
+							ID:    12345,
+							Likes: 1,
+						},
+					},
+					metav1.UpdateOptions{},
+				},
+				&v1.Tweet{},
+				nil,
 			),
 			name: "hello-world",
 			in: &tweettypes.Tweet{
 				Spec: tweettypes.TweetSpec{
+					Name: "hello-world",
 					Text: "Hello World",
 				},
 				Status: tweettypes.TweetStatus{
-					ID:       12345,
-					Likes:    1,
-					Retweets: 2,
-					Replies:  3,
+					ID:    12345,
+					Likes: 1,
 				},
 			},
-			calls: 1,
-			err:   nil,
+			updated: true,
+			err:     nil,
+		},
+		"tweet status already up to date no update": {
+			tweetClient: newTweetClientMock(
+				"Get",
+				[]interface{}{"hello-world"},
+				&v1.Tweet{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "hello-world",
+					},
+					Spec: v1.TweetSpec{
+						Text: "Hello World",
+					},
+					Status: v1.TweetStatus{
+						ID:    12345,
+						Likes: 1,
+					},
+				},
+				nil,
+			),
+			name: "hello-world",
+			in: &tweettypes.Tweet{
+				Spec: tweettypes.TweetSpec{
+					Name: "hello-world",
+					Text: "Hello World",
+				},
+				Status: tweettypes.TweetStatus{
+					ID:    12345,
+					Likes: 1,
+				},
+			},
+			updated: false,
+			err:     nil,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := test.client.UpdateStatus(test.name, test.in)
+			client := NewK8sClient(test.tweetClient)
+			updated, err := client.UpdateStatus(test.name, test.in)
 			if err != nil {
 				assert.EqualError(t, err, test.err.Error())
 			}
-			test.client.tweetClient.(*tweetClientMock).AssertNumberOfCalls(t, "Get", test.calls)
-			test.client.tweetClient.(*tweetClientMock).AssertNumberOfCalls(t, "Update", test.calls)
+			assert.Equal(t, test.updated, updated)
+			test.tweetClient.AssertExpectations(t)
 		})
 	}
 }
@@ -135,7 +200,7 @@ func Test_ListTweets(t *testing.T) {
 			client: NewK8sClient(
 				newTweetClientMock(
 					"List",
-					metav1.ListOptions{},
+					[]interface{}{metav1.ListOptions{}},
 					&v1.TweetList{
 						Items: []v1.Tweet{
 							{
@@ -176,7 +241,7 @@ func Test_ListTweets(t *testing.T) {
 			client: NewK8sClient(
 				newTweetClientMock(
 					"List",
-					metav1.ListOptions{},
+					[]interface{}{metav1.ListOptions{}},
 					&v1.TweetList{
 						Items: []v1.Tweet{
 							{
@@ -223,7 +288,7 @@ func Test_ListTweets(t *testing.T) {
 			client: NewK8sClient(
 				newTweetClientMock(
 					"List",
-					metav1.ListOptions{},
+					[]interface{}{metav1.ListOptions{}},
 					&v1.TweetList{
 						Items: []v1.Tweet{},
 					},
@@ -245,9 +310,9 @@ func Test_ListTweets(t *testing.T) {
 	}
 }
 
-func newTweetClientMock(methodName string, arg interface{}, ret interface{}, err error) *tweetClientMock {
+func newTweetClientMock(methodName string, arg []interface{}, ret interface{}, err error) *tweetClientMock {
 	client := new(tweetClientMock)
-	client.On(methodName, arg).Return(ret, err)
+	client.On(methodName, arg...).Return(ret, err)
 	return client
 }
 
@@ -295,6 +360,11 @@ func newTweetClientMockUpdateStatus() *tweetClientMock {
 
 type tweetClientMock struct {
 	mock.Mock
+}
+
+func (mock *tweetClientMock) addMethod(name string, args []interface{}, ret interface{}, err error) *tweetClientMock {
+	mock.On(name, args...).Return(ret, err)
+	return mock
 }
 
 func (mock *tweetClientMock) Create(ctx context.Context, tweet *v1.Tweet, opts metav1.CreateOptions) (*v1.Tweet, error) {

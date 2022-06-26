@@ -38,7 +38,7 @@ func Test_ReconcileDeleteTweet(t *testing.T) {
 			).addMethod(
 				"UpdateStatus",
 				[]interface{}{newTweet("hello-world", "Hello World", 1)},
-				nil,
+				false,
 				nil,
 			).addMethod(
 				"ListTweets",
@@ -429,9 +429,9 @@ func (mock *k8sClientMock) GetTweet(name string) (*tweettypes.Tweet, error) {
 	return args.Get(0).(*tweettypes.Tweet), args.Error(1)
 }
 
-func (mock *k8sClientMock) UpdateStatus(name string, tweet *tweettypes.Tweet) error {
+func (mock *k8sClientMock) UpdateStatus(name string, tweet *tweettypes.Tweet) (updated bool, err error) {
 	args := mock.Called(tweet)
-	return args.Error(0)
+	return args.Get(0).(bool), args.Error(1)
 }
 
 func (mock *k8sClientMock) ListTweets() (*tweettypes.Tweets, error) {

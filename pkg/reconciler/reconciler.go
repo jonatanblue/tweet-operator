@@ -9,7 +9,7 @@ import (
 
 type K8sClient interface {
 	GetTweet(name string) (*tweettypes.Tweet, error)
-	UpdateStatus(name string, tweet *tweettypes.Tweet) error
+	UpdateStatus(name string, tweet *tweettypes.Tweet) (updated bool, err error)
 	ListTweets() (*tweettypes.Tweets, error)
 }
 
@@ -67,13 +67,16 @@ func (reconciler *TweetReconciler) Reconcile() (bool, error) {
 			return false, errors.Wrapf(err, "failed to reconcile %s", t.Spec.Name)
 		}
 
+		if !reconciled {
+			return false, nil
+		}
+
 		// Update custom resource with latest status
-		err = reconciler.k8sClient.UpdateStatus(t.Spec.Name, actual)
+		updated, err := reconciler.k8sClient.UpdateStatus(t.Spec.Name, actual)
 		if err != nil {
 			return false, errors.Wrapf(err, "failed to update status for %s", t.Spec.Name)
 		}
-
-		if !reconciled {
+		if updated {
 			return false, nil
 		}
 	}
