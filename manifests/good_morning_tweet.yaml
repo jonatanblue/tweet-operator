@@ -1,0 +1,6 @@
+apiVersion: example.com/v1
+kind: Tweet
+metadata:
+  name: good-morning
+spec:
+  text: "Good morning :)"
