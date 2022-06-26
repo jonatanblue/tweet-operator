@@ -6,6 +6,7 @@ type Tweet struct {
 }
 
 type TweetSpec struct {
+	Name string
 	Text string
 }
 

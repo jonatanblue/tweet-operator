@@ -93,25 +93,7 @@ func Test_UpdateStatus(t *testing.T) {
 	}{
 		"tweet status updated no error": {
 			client: NewK8sClient(
-				newTweetClientMockMultiArg(
-					"UpdateStatus",
-					[]interface{}{
-						&v1.Tweet{
-							ObjectMeta: metav1.ObjectMeta{
-								Name: "hello-world",
-							},
-							Status: v1.TweetStatus{
-								ID:       12345,
-								Likes:    0,
-								Retweets: 0,
-								Replies:  0,
-							},
-						},
-						metav1.UpdateOptions{},
-					},
-					nil,
-					nil,
-				),
+				newTweetClientMockUpdateStatus(),
 			),
 			name: "hello-world",
 			in: &tweettypes.Tweet{
@@ -120,9 +102,9 @@ func Test_UpdateStatus(t *testing.T) {
 				},
 				Status: tweettypes.TweetStatus{
 					ID:       12345,
-					Likes:    0,
-					Retweets: 0,
-					Replies:  0,
+					Likes:    1,
+					Retweets: 2,
+					Replies:  3,
 				},
 			},
 			calls: 1,
@@ -136,7 +118,128 @@ func Test_UpdateStatus(t *testing.T) {
 			if err != nil {
 				assert.EqualError(t, err, test.err.Error())
 			}
+			test.client.tweetClient.(*tweetClientMock).AssertNumberOfCalls(t, "Get", test.calls)
 			test.client.tweetClient.(*tweetClientMock).AssertNumberOfCalls(t, "Update", test.calls)
+		})
+	}
+}
+
+func Test_ListTweets(t *testing.T) {
+	tests := map[string]struct {
+		client *K8sClient
+		want   *tweettypes.Tweets
+		err    error
+	}{
+		"found 1 tweet": {
+			client: NewK8sClient(
+				newTweetClientMock(
+					"List",
+					metav1.ListOptions{},
+					&v1.TweetList{
+						Items: []v1.Tweet{
+							{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "hello-world",
+								},
+								Spec: v1.TweetSpec{
+									Text: "Hello World",
+								},
+								Status: v1.TweetStatus{
+									ID:       12345,
+									Likes:    0,
+									Retweets: 0,
+									Replies:  0,
+								},
+							},
+						},
+					},
+					nil,
+				),
+			),
+			want: &tweettypes.Tweets{
+				{
+					Spec: tweettypes.TweetSpec{
+						Name: "hello-world",
+						Text: "Hello World",
+					},
+					Status: tweettypes.TweetStatus{
+						ID:       12345,
+						Likes:    0,
+						Retweets: 0,
+						Replies:  0,
+					},
+				},
+			},
+		},
+		"found 2 tweets": {
+			client: NewK8sClient(
+				newTweetClientMock(
+					"List",
+					metav1.ListOptions{},
+					&v1.TweetList{
+						Items: []v1.Tweet{
+							{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "hello-world",
+								},
+								Spec: v1.TweetSpec{
+									Text: "Hello World",
+								},
+								Status: v1.TweetStatus{},
+							},
+							{
+								ObjectMeta: metav1.ObjectMeta{
+									Name: "hello-world-2",
+								},
+								Spec: v1.TweetSpec{
+									Text: "Hello World 2",
+								},
+								Status: v1.TweetStatus{},
+							},
+						},
+					},
+					nil,
+				),
+			),
+			want: &tweettypes.Tweets{
+				{
+					Spec: tweettypes.TweetSpec{
+						Name: "hello-world",
+						Text: "Hello World",
+					},
+					Status: tweettypes.TweetStatus{},
+				},
+				{
+					Spec: tweettypes.TweetSpec{
+						Name: "hello-world-2",
+						Text: "Hello World 2",
+					},
+					Status: tweettypes.TweetStatus{},
+				},
+			},
+		},
+		"found no tweets": {
+			client: NewK8sClient(
+				newTweetClientMock(
+					"List",
+					metav1.ListOptions{},
+					&v1.TweetList{
+						Items: []v1.Tweet{},
+					},
+					nil,
+				),
+			),
+			want: &tweettypes.Tweets{},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tweets, err := test.client.ListTweets()
+			if err != nil {
+				assert.EqualError(t, err, test.err.Error())
+			}
+			assert.Equal(t, test.want, tweets)
 		})
 	}
 }
@@ -147,9 +250,45 @@ func newTweetClientMock(methodName string, arg interface{}, ret interface{}, err
 	return client
 }
 
-func newTweetClientMockMultiArg(methodName string, args []interface{}, ret interface{}, err error) *tweetClientMock {
+func newTweetClientMockUpdateStatus() *tweetClientMock {
+
 	client := new(tweetClientMock)
-	client.On(methodName, args...).Return(ret, err)
+
+	client.On(
+		"Update",
+		&v1.Tweet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hello-world",
+			},
+			Status: v1.TweetStatus{
+				ID:       12345,
+				Likes:    1,
+				Retweets: 2,
+				Replies:  3,
+			},
+		},
+		metav1.UpdateOptions{},
+	).Return(
+		nil,
+		nil,
+	).On(
+		"Get",
+		"hello-world",
+	).Return(
+		&v1.Tweet{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "hello-world",
+			},
+			Status: v1.TweetStatus{
+				ID:       12345,
+				Likes:    1,
+				Retweets: 2,
+				Replies:  3,
+			},
+		},
+		nil,
+	)
+
 	return client
 }
 

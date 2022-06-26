@@ -63,3 +63,26 @@ func (c *K8sClient) UpdateStatus(name string, tweet *tweettypes.Tweet) error {
 	)
 	return err
 }
+
+func (c *K8sClient) ListTweets() (*tweettypes.Tweets, error) {
+	list, err := c.tweetClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+	tweets := tweettypes.Tweets{}
+	for _, t := range list.Items {
+		tweets = append(tweets, tweettypes.Tweet{
+			Spec: tweettypes.TweetSpec{
+				Name: t.Name,
+				Text: t.Spec.Text,
+			},
+			Status: tweettypes.TweetStatus{
+				ID:       t.Status.ID,
+				Likes:    t.Status.Likes,
+				Retweets: t.Status.Retweets,
+				Replies:  t.Status.Replies,
+			},
+		})
+	}
+	return &tweets, nil
+}
