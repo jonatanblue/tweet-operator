@@ -18,6 +18,13 @@ import (
 	tweetclient "github.com/jonatanblue/tweet-operator/pkg/client/clientset/versioned"
 )
 
+type runMode string
+
+const (
+	runModeLoop    = runMode("loop")
+	runModeRunOnce = runMode("run-once")
+)
+
 func mustLookupEnv(key string) string {
 	value := os.Getenv(key)
 	if value == "" {
@@ -57,6 +64,12 @@ func getKubeConfig() (*rest.Config, error) {
 }
 
 func main() {
+	runMode := runModeLoop
+	// Lookup optional run mode env var
+	if os.Getenv("RUN_MODE") == "run-once" {
+		runMode = runModeRunOnce
+	}
+
 	// Kubernetes client
 	kubeConfig, err := getKubeConfig()
 	if err != nil {
@@ -96,6 +109,10 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Printf("main: reconciled=%v", reconciled)
+
+		if runMode == runModeRunOnce {
+			break
+		}
 
 		<-time.After(10 * time.Second)
 	}
