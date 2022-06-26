@@ -38,7 +38,13 @@ spec:
             type: object
           status:
             properties:
+              id:
+                format: int64
+                type: integer
               likes:
+                format: int64
+                type: integer
+              replies:
                 format: int64
                 type: integer
               retweets:
